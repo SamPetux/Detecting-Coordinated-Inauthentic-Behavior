@@ -1,0 +1,43 @@
+# Confirmatory configuration (docs/06_protocol.md). `frozen: true` is set only after the author approves the protocol.
+frozen: false
+seed: 0
+timezone: Europe/Moscow
+splits:
+  explore_end: "2026-06-01T00:00:00+03:00"
+  confirm_end: "2026-11-16T00:00:00+03:00"
+
+layers:
+  cotarget: {window_s: 600}
+  semantic: {window_s: 3600, min_cos: 0.92, min_chars: 20, model: intfloat/multilingual-e5-small}
+  lexical: {window_s: 3600, min_jaccard: 0.6, shingle: 5, num_perm: 128}
+  style: {enabled: true, min_messages: 3}  # reinforces T/S pairs only
+  machine: {detector: char_ngram_lr, min_prob: 0.5}
+
+null_model:
+  bucket: community_day
+  permutations: 50
+  min_obs: 2
+  fdr_q: 0.01
+
+fusion:
+  method: sum_neglog10p
+  account_agg: top3
+  leiden_resolution: 1.0
+  min_cluster: 3
+
+gnn:
+  conv: gine
+  hidden: 64
+  layers: 2
+  dropout: 0.2
+  node_features: none  # graph only; text node features violated H5 in exploration
+  training: pooled_explore  # one model on all exploratory runs (all levels, seeds 1-2)
+
+evaluation:
+  target_fpr: [0.001, 0.01]
+  bootstrap: 2000
+  seeds: [11, 12, 13]
+  generators: {A: gpt-4o-mini, B: gpt-5-mini}
+
+budget:
+  stop_usd: 40

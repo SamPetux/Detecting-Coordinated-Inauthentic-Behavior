@@ -35,14 +35,18 @@ def labels(msgs: pd.DataFrame) -> pd.DataFrame:
     # GroupBy has a .level attribute of its own, so columns are accessed by key
     out = pd.DataFrame({"positive": g["campaign_id"].agg(lambda s: s.notna().any()),
                         "benign": g["level"].agg(lambda s: s.isin(["benign_llm", "benign_hot"]).any()),
+                        "benign_hot": g["level"].agg(lambda s: (s == "benign_hot").any()),
                         "injected": g["is_injected"].any()})
     out["organic"] = ~out.injected
     out["campaign"] = g["campaign_id"].agg(lambda s: s.dropna().iloc[0] if s.notna().any() else None)
     return out
 
 
+H3_DETECTORS = ("full", "full_noMY", "layer_T", "layer_S", "raw_T", "raw_S")
+
+
 def score_table(scores: dict[str, pd.Series], lab: pd.DataFrame, fprs=(0.001, 0.01),
-                clusters: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
+                clusters: dict[str, pd.DataFrame] | None = None, msgs: pd.DataFrame | None = None) -> pd.DataFrame:
     rows = []
     for name, s in scores.items():
         s = s.reindex(lab.index, fill_value=0.0).fillna(0.0)
@@ -52,7 +56,14 @@ def score_table(scores: dict[str, pd.Series], lab: pd.DataFrame, fprs=(0.001, 0.
             rec, thr = metrics.recall_at_fpr(s, lab.positive, lab.organic, f)
             r[f"recall@{f}"] = rec
             r[f"benign_flag@{f}"] = metrics.flagged_rate(s, lab.index[lab.benign], thr) if lab.benign.any() else np.nan
+            if "benign_hot" in lab and lab.benign_hot.any():
+                r[f"benign_hot_flag@{f}"] = metrics.flagged_rate(s, lab.index[lab.benign_hot], thr)
             r[f"organic_flag@{f}"] = metrics.flagged_rate(s, lab.index[lab.organic], thr)
+        if msgs is not None and name in H3_DETECTORS:
+            _, thr = metrics.recall_at_fpr(s, lab.positive, lab.organic, 0.01)
+            h3 = metrics.burst_flag_ratio(s, msgs, lab.index[lab.organic], thr)
+            r["h3_flag_burst@0.01"], r["h3_flag_other@0.01"], r["h3_ratio@0.01"] = (h3["flag_burst"],
+                                                                                   h3["flag_other"], h3["ratio"])
         if clusters and name in clusters:
             f1 = metrics.best_cluster_f1(clusters[name], lab.campaign)
             r["f1_star_mean"] = float(f1.mean()) if len(f1) else np.nan
@@ -61,8 +72,8 @@ def score_table(scores: dict[str, pd.Series], lab: pd.DataFrame, fprs=(0.001, 0.
 
 
 def run_once(bg: pd.DataFrame, syn: pd.DataFrame, cfg: dict, *, emb: np.ndarray, row_of: pd.Series,
-             machine_prob: pd.Series | None, seed: int = 0, log=print) -> tuple[pd.DataFrame, pipeline.Result,
-                                                                                pd.DataFrame]:
+             machine_prob: pd.Series | None, seed: int = 0, log=print, extra_scores: dict | None = None
+             ) -> tuple[pd.DataFrame, pipeline.Result, pd.DataFrame]:
     msgs = inject.inject(bg, syn)
     res = pipeline.run(msgs, cfg, emb=emb, row_of=row_of, machine_prob=machine_prob, seed=seed, log=log)
     lab = labels(msgs)
@@ -78,7 +89,8 @@ def run_once(bg: pd.DataFrame, syn: pd.DataFrame, cfg: dict, *, emb: np.ndarray,
     scores["copypaste"] = baselines.copypaste(msgs)
     if machine_prob is not None:
         scores["account_machine"] = baselines.account_machine(msgs[msgs.kind != "post"], machine_prob)
-    table = score_table(scores, lab, clusters={"full": res.clusters})
+    scores.update(extra_scores or {})
+    table = score_table(scores, lab, clusters={"full": res.clusters}, msgs=msgs)
     return table, res, lab
 
 

@@ -66,3 +66,24 @@ def visibility(msgs: pd.DataFrame, top: int = 10) -> pd.Series:
     c = c.assign(rank=c.groupby("target_id").cumcount())
     camp = c[c.campaign_id.notna()]
     return camp.groupby("campaign_id")["rank"].apply(lambda r: float((r < top).mean()))
+
+
+def burst_hours(msgs: pd.DataFrame, q: float = 0.95) -> set[tuple[str, int]]:
+    """(community, hour) cells whose message count exceeds the community's q-quantile of non-empty hours."""
+    m = msgs[msgs.kind != "post"]
+    cnt = m.groupby([m.community, m.ts // 3600]).size()
+    thr = cnt.groupby(level=0).transform(lambda s: s.quantile(q))
+    return set(cnt[cnt > thr].index)
+
+
+def burst_flag_ratio(score: pd.Series, msgs: pd.DataFrame, organic: pd.Index, thr: float,
+                     q: float = 0.95) -> dict:
+    """H3: flag rate of organic accounts writing mostly (>=50%) in burst hours vs the other organic accounts."""
+    cells = burst_hours(msgs, q)
+    m = msgs[(msgs.kind != "post") & msgs.account_id.isin(organic)]
+    in_burst = pd.Series([(c, h) in cells for c, h in zip(m.community, m.ts // 3600)], index=m.index)
+    share = in_burst.groupby(m.account_id).mean()
+    hot, cold = share.index[share >= 0.5], share.index[share < 0.5]
+    fh, fc = flagged_rate(score, hot, thr), flagged_rate(score, cold, thr)
+    return {"burst_accounts": len(hot), "flag_burst": fh, "flag_other": fc,
+            "ratio": fh / fc if fc > 0 else (np.inf if fh > 0 else np.nan)}

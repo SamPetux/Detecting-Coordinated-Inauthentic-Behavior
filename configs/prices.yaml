@@ -1,9 +1,0 @@
-# USD per 1M tokens, standard tier; Batch API = 50% of these (applied in code).
-# Source 2026-11-18: third-party aggregators (calcis.dev, computeprices.com, lmmarketcap.com, apievangelist.com);
-# the official pricing page is not reachable from this environment. Ledger uses real token counts from responses.
-models:
-  gpt-4o-mini:  {input: 0.15, cached_input: 0.075, output: 0.60}
-  gpt-4.1-mini: {input: 0.40, cached_input: 0.10,  output: 1.60}
-  gpt-5-nano:   {input: 0.05, cached_input: 0.005, output: 0.40}
-  gpt-5-mini:   {input: 0.25, cached_input: 0.025, output: 2.00}
-  gpt-5.4-nano: {input: 0.20, cached_input: 0.02,  output: 1.25}

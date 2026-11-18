@@ -1,1 +1,0 @@
-"""Synchronisation layers between accounts."""

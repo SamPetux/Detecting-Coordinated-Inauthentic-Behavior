@@ -137,7 +137,7 @@ class LLM:
         return r.output_text
 
     def run_batch(self, model: str, requests: list[tuple[str, str]], *, params: dict | None = None,
-                  max_output_tokens: int = 300, tag: str = "", poll_s: int = 600,
+                  max_output_tokens: int = 300, tag: str = "", poll_s: int = 60,
                   est_input_tokens: int = 1500, nonces: list[str] | None = None,
                   max_bytes: int = 150 * 1024 * 1024) -> list[str | None]:
         """requests = [(instructions, prompt)]; returns texts in order (None for failed items)."""

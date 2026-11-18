@@ -49,3 +49,12 @@ def test_stats_helpers():
     assert d == 1.0 and p < 0.01
     h = stats.holm({"a": 0.01, "b": 0.04, "c": 0.03})
     assert h == {"a": 0.03, "c": 0.06, "b": 0.06}
+
+
+def test_burst_flag_ratio():
+    rows = [dict(account_id=f"a{i}", community="g", ts=3600 * 10 + i, kind="comment") for i in range(30)]
+    rows += [dict(account_id=f"b{i}", community="g", ts=3600 * (20 + i), kind="comment") for i in range(30)]
+    m = pd.DataFrame(rows)
+    score = pd.Series({**{f"a{i}": 1.0 for i in range(30)}, **{f"b{i}": 0.0 for i in range(30)}})
+    r = metrics.burst_flag_ratio(score, m, pd.Index(score.index), thr=0.5)
+    assert r["burst_accounts"] == 30 and r["flag_burst"] == 1.0 and r["flag_other"] == 0.0

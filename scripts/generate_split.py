@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 
 import pandas as pd
+import yaml
 from dotenv import load_dotenv
 
 from cib.generate import ladder, runner
@@ -72,7 +73,20 @@ def main() -> None:
         plans.append(ladder.plan_benign(bg, n_accounts=50, salt=salt, seed=12, generators=["gpt-5-nano"],
                                         split="explore"))
     else:
-        raise SystemExit("confirmatory generation is allowed only after the protocol freeze (T16)")
+        cfg = yaml.safe_load(open("configs/confirm.yaml")) if Path("configs/confirm.yaml").exists() else {}
+        if not cfg.get("frozen"):
+            raise SystemExit("confirmatory generation is allowed only after the protocol freeze (T16)")
+        a, b = "gpt-4o-mini", "gpt-5-mini"
+        plans = []
+        for seed in (11, 12, 13):
+            # shared-text levels use one generator per seed; persona levels mix both per account
+            low = [b] if seed == 12 else [a]
+            plans += plans_for(bg, "confirm", low, [seed], ["L0", "L1", "L2"], salt, "B" if seed == 12 else "A")
+            plans += plans_for(bg, "confirm", [a, b], [seed], ["L3", "L4", "L5"], salt, "AB")
+        plans.append(ladder.plan_benign(bg, n_accounts=200, salt=salt, seed=21, generators=[a], split="confirm"))
+        plans.append(ladder.plan_benign(bg, n_accounts=200, salt=salt, seed=22, generators=[b], split="confirm"))
+        plans.append(ladder.plan_benign_hot(bg, n_accounts=60, n_posts=15, salt=salt, seed=23, generators=[a, b],
+                                            split="confirm"))
     plan = pd.concat(plans, ignore_index=True)
     llm = LLM()
     req = ladder.requests(plan)

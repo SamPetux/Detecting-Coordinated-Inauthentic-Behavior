@@ -18,11 +18,13 @@ N_ORG_TRAIN = 40000
 def main() -> None:
     bg = pd.read_parquet("data/interim/vk_messages.parquet")
     bg = bg[(bg.split == "explore") & (bg.kind != "post") & bg.text.str.len().gt(0) & ~bg.author_is_community]
-    syn = pd.read_parquet("data/synthetic/explore/messages.parquet")
+    syn = pd.concat([pd.read_parquet("data/synthetic/explore/messages.parquet"),
+                     pd.read_parquet("data/synthetic/explore_controls/benign_hot.parquet")], ignore_index=True)
     syn = syn[syn.text.str.len() > 0]
     tag = syn.campaign_id.fillna("").str.extract(r"-(A|C)$")[0]
     seed = syn.campaign_id.fillna("").str.extract(r"-s(\d)\d*-")[0]
-    is_c = (tag == "C") | syn.msg_id.str.contains("benign-explore-s12")
+    # generator C and the hot-thread control are never used for training: both models score them
+    is_c = (tag == "C") | syn.msg_id.str.contains("benign-explore-s12") | (syn.level == "benign_hot")
     benign_a = syn.msg_id.str.contains("benign-explore-s11")
     accs = bg.account_id.drop_duplicates().sample(frac=1, random_state=0)
     half = pd.Series(np.arange(len(accs)) % 2, index=accs.to_numpy())

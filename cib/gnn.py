@@ -52,6 +52,12 @@ class EdgeGNN(nn.Module):
         return self.out(h).squeeze(-1)
 
 
+def union(graphs: list[Data], ys: list[np.ndarray]) -> tuple[Data, np.ndarray]:
+    """Disjoint union of several graphs (e.g. runs of different attacker levels) for one training set."""
+    from torch_geometric.data import Batch
+    return Batch.from_data_list(graphs), np.concatenate(ys)
+
+
 def train(d: Data, y: np.ndarray, mask: np.ndarray, *, val_mask: np.ndarray | None = None, epochs: int = 300,
           lr: float = 5e-3, seed: int = 0, patience: int = 30, **kw) -> EdgeGNN:
     torch.manual_seed(seed)

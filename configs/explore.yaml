@@ -1,0 +1,39 @@
+# Exploration defaults (layers, null model, fusion). The confirmatory config is a frozen copy (T16).
+seed: 0
+timezone: Europe/Moscow
+splits:
+  explore_end: "2026-06-01T00:00:00+03:00"
+  confirm_end: "2026-11-16T00:00:00+03:00"
+
+layers:
+  cotarget: {window_s: 600}
+  semantic: {window_s: 3600, min_cos: 0.92, min_chars: 20, model: intfloat/multilingual-e5-small}
+  lexical: {window_s: 3600, min_jaccard: 0.6, shingle: 5, num_perm: 128}
+  style: {enabled: true, min_messages: 3}  # reinforces T/S pairs only
+  machine: {detector: zero_shot}
+
+null_model:
+  bucket: community_hour  # community_hour | community_3h | community_day
+  permutations: 50
+  min_obs: 2
+  fdr_q: 0.01
+
+fusion:
+  method: sum_neglog10p
+  account_agg: top3  # max | top3 | sum | excess
+  leiden_resolution: 1.0
+  min_cluster: 3
+
+gnn:
+  conv: gine
+  hidden: 64
+  layers: 2
+  dropout: 0.2
+  knn_context: 10
+
+evaluation:
+  target_fpr: [0.001, 0.01]
+  bootstrap: 2000
+
+budget:
+  stop_usd: 40

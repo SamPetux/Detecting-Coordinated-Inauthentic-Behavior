@@ -114,3 +114,21 @@ def gnn_scores(train: tuple[pipeline.Result, pd.DataFrame, pd.DataFrame], test: 
     groups = gnn.groups(r_te.fused, prob, theta=theta, resolution=cfg["fusion"]["leiden_resolution"],
                         min_cluster=cfg["fusion"]["min_cluster"], seed=seed)
     return prob, groups
+
+
+def per_campaign_recall(scores: dict[str, pd.Series], lab: pd.DataFrame, fpr: float,
+                        group: pd.Series | None = None) -> pd.DataFrame:
+    """Recall of each campaign (optionally split by `group`, e.g. generator of the account) at the organic-FPR
+    threshold of each detector. Long format: detector, campaign, [group], n, recall."""
+    rows = []
+    pos = lab[lab.positive]
+    for name, s in scores.items():
+        s = s.reindex(lab.index, fill_value=0.0).fillna(0.0)
+        _, thr = metrics.recall_at_fpr(s, lab.positive, lab.organic, fpr)
+        hit = s.reindex(pos.index) > thr
+        keys = [pos.campaign] if group is None else [pos.campaign, group.reindex(pos.index)]
+        for k, h in hit.groupby(keys):
+            k = k if isinstance(k, tuple) else (k,)
+            rows.append({"detector": name, "campaign": k[0], **({"group": k[1]} if group is not None else {}),
+                         "n": int(len(h)), "recall": float(h.mean()), "fpr": fpr})
+    return pd.DataFrame(rows)

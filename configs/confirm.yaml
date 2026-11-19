@@ -1,5 +1,5 @@
 # Confirmatory configuration (docs/06_protocol.md). `frozen: true` is set only after the author approves the protocol.
-frozen: false
+frozen: true
 seed: 0
 timezone: Europe/Moscow
 splits:

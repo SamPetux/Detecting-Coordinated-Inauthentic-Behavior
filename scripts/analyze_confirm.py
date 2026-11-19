@@ -112,9 +112,17 @@ def main() -> None:
     lines = ["# Результаты подтверждающей проверки", "",
              "Строго по `docs/06_protocol.md` (заморожен 2026-11-18). Recall — доля аккаунтов кампании при пороге 0,1 % "
              "ложных тревог на органике; единица — кампания; тесты — односторонний Уилкоксон, поправка Холма.", "",
-             "| Гипотеза | Значения | Критерий выполнен | p (Холм) |", "|---|---|---|---|"]
+             "Гипотеза подтверждена, только если выполнены и точечный критерий, и тест (H1a, H1b, H2, H4: p Холма < 0,05; "
+             "H5: биномиальный p < 0,05; H3 — по бутстрэп-границе).", "",
+             "| Гипотеза | Значения | Точечный критерий | p | Итог по протоколу |", "|---|---|---|---|---|"]
+    test_ok = {h: adj[h] < 0.05 for h in adj}
+    test_ok["H5"] = p5 < 0.05
+    test_ok["H3"] = lo >= 0.5
+    p_show = dict(adj, H5=p5)
     for h, txt, ok in out:
-        lines.append(f"| {h} | {txt} | {'да' if ok else 'нет'} | {adj.get(h, float('nan')):.3g} |")
+        p = p_show.get(h, float("nan"))
+        verdict = "подтверждена" if ok and test_ok.get(h, False) else "не подтверждена"
+        lines.append(f"| {h} | {txt} | {'да' if ok else 'нет'} | {p:.3g} | {verdict} |")
     lv = summ.groupby(["detector", "level"])["recall@0.001"].mean().unstack("level")
     lines += ["", "## Recall при FPR 0,1 % по уровням (среднее по seed 11–13)", "", lv.round(3).to_markdown(), ""]
     Path("docs/07_confirmatory_results.md").write_text("\n".join(lines) + "\n")
